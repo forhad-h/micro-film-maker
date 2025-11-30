@@ -37,7 +37,7 @@ export default function FilmDisplay() {
       const videoResponse = await fetch("/api/generate-video", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ shots: state.shots }),
+        body: JSON.stringify({ shots: state.shots, filmSlug: state.filmSlug }),
       })
 
       const videoData = await videoResponse.json()

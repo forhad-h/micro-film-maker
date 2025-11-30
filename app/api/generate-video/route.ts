@@ -72,7 +72,7 @@ const CONSERVATIVE_AUDIO_NEGATIVE_PROMPT = [
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { shots } = body
+    const { shots, filmSlug } = body
 
     if (!shots) {
       return NextResponse.json(
@@ -138,7 +138,13 @@ export async function POST(request: NextRequest) {
         const videoBlob = new Blob([arrayBuffer], { type: "video/mp4" })
 
         const filename = `${requestId}_${idx + 1}.mp4`
-        const publicUrl = await uploadVideoToSupabase(videoBlob, filename)
+        const publicUrl = await uploadVideoToSupabase(
+          videoBlob,
+          filename,
+          typeof filmSlug === "string" && filmSlug.trim().length > 0
+            ? filmSlug
+            : undefined
+        )
 
         return publicUrl
       })

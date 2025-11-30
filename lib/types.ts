@@ -1,41 +1,49 @@
 export interface Message {
-  role: "user" | "assistant" | "system";
-  content: string;
-  type?: "concept" | "script" | "shots" | "error" | "suggestion";
+  role: "user" | "assistant" | "system"
+  content: string
+  type?: "concept" | "script" | "shots" | "error" | "suggestion"
 }
 
 export interface FilmGenerationState {
-  step: "idle" | "validating-concept" | "generating-script" | "validating-script" | "planning-shots" | "generating-video" | "completed";
-  concept?: string;
-  script?: string;
-  shots?: string;
-  videoUrl?: string;
-  videoUrls?: string[];
-  language: string;
-  targetPlatform: string;
-  tone: string;
-  preferredSoundStyle: string;
+  step:
+    | "idle"
+    | "validating-concept"
+    | "generating-script"
+    | "validating-script"
+    | "planning-shots"
+    | "generating-video"
+    | "completed"
+  concept?: string
+  script?: string
+  shots?: string
+  videoUrl?: string
+  videoUrls?: string[]
+  filmSlug?: string
+  language: string
+  targetPlatform: string
+  tone: string
+  preferredSoundStyle: string
 }
 
 export interface ValidateConceptRequest {
-  concept: string;
+  concept: string
 }
 
 export interface GenerateScriptRequest {
-  concept: string;
+  concept: string
 }
 
 export interface ValidateScriptRequest {
-  script: string;
+  script: string
 }
 
 export interface PlanShotsRequest {
-  script: string;
-  preferred_sound_style: string;
-  target_platform: string;
+  script: string
+  preferred_sound_style: string
+  target_platform: string
 }
 
 export interface ApiResponse {
-  result?: string;
-  error?: string;
+  result?: string
+  error?: string
 }

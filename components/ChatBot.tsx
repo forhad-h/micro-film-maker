@@ -138,7 +138,21 @@ export default function ChatBot() {
 
     try {
       // Step 1: Validate concept
-      setState({ ...state, step: "validating-concept", concept: userConcept })
+      const baseSlug = userConcept
+        .toLowerCase()
+        .replace(/[^a-z0-9\s-]/g, "")
+        .trim()
+        .replace(/\s+/g, "-")
+        .slice(0, 60)
+      const initialSlug = baseSlug
+        ? `${baseSlug}-${Date.now()}`
+        : `film-${Date.now()}`
+      setState({
+        ...state,
+        step: "validating-concept",
+        concept: userConcept,
+        filmSlug: initialSlug,
+      })
 
       addMessage({
         role: "assistant",
@@ -204,7 +218,26 @@ export default function ChatBot() {
       }
 
       const generatedScript = scriptData.result
-      setState({ ...state, script: generatedScript, step: "validating-script" })
+      // Try to refine slug using first line of script as title
+      let refinedSlug = state.filmSlug || initialSlug
+      const firstLine = generatedScript.split(/\r?\n/)[0]
+      if (firstLine && firstLine.length < 120) {
+        const cleaned = firstLine
+          .toLowerCase()
+          .replace(/[^a-z0-9\s-]/g, "")
+          .trim()
+          .replace(/\s+/g, "-")
+          .slice(0, 60)
+        if (cleaned && cleaned.length > 4) {
+          refinedSlug = `${cleaned}-${Date.now()}`
+        }
+      }
+      setState({
+        ...state,
+        script: generatedScript,
+        step: "validating-script",
+        filmSlug: refinedSlug,
+      })
       setEditedScript(generatedScript)
 
       addMessage({
