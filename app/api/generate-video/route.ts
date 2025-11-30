@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
+import { uploadVideoToSupabase } from "@/lib/supabase"
 
 const FAL_KEY = process.env.FAL_KEY
 
@@ -16,11 +17,20 @@ interface FalAIQueueResponse {
 
 interface FalAIStatusResponse {
   status: "IN_QUEUE" | "IN_PROGRESS" | "COMPLETED" | "FAILED"
-  output?: {
-    video?: {
-      url: string
-    }
+  request_id: string
+  response_url: string
+  status_url: string
+  cancel_url: string
+}
+
+interface FalAIResultResponse {
+  video: {
+    url: string
+    content_type: string
+    file_name: string
+    file_size: number
   }
+  seed: number
 }
 
 const CONSERVATIVE_NEGATIVE_PROMPT = [
@@ -64,7 +74,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const { shots } = body
 
-    if (!shots || typeof shots !== "string") {
+    if (!shots) {
       return NextResponse.json(
         { error: "Invalid shots format" },
         { status: 400 }
@@ -72,7 +82,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Parse the shots into individual prompts
-    const shotPrompts = extractShotPrompts(shots)
+    const shotPrompts = normalizeShotsToPrompts(shots)
 
     if (shotPrompts.length === 0) {
       return NextResponse.json(
@@ -88,44 +98,56 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Generate videos for each shot
-    const videoUrls: string[] = []
+    // Generate videos for each shot concurrently
+    const uploadedUrls: string[] = await Promise.all(
+      shotPrompts.map(async (prompt, idx) => {
+        // Submit to Fal AI queue
+        const queueResponse = await fetch("https://queue.fal.run/fal-ai/ovi", {
+          method: "POST",
+          headers: {
+            Authorization: `Key ${FAL_KEY}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            prompt,
+            negative_prompt: CONSERVATIVE_NEGATIVE_PROMPT,
+            num_inference_steps: 30,
+            audio_negative_prompt: CONSERVATIVE_AUDIO_NEGATIVE_PROMPT,
+            resolution: "992x512",
+          } as FalAIRequest),
+        })
 
-    for (let i = 0; i < shotPrompts.length; i++) {
-      const prompt = shotPrompts[i]
+        if (!queueResponse.ok) {
+          throw new Error(`Failed to submit shot ${idx + 1} to Fal AI`)
+        }
 
-      // Submit to Fal AI queue
-      const queueResponse = await fetch("https://queue.fal.run/fal-ai/ovi", {
-        method: "POST",
-        headers: {
-          Authorization: `Key ${FAL_KEY}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          prompt,
-          negative_prompt: CONSERVATIVE_NEGATIVE_PROMPT,
-          num_inference_steps: 30,
-          audio_negative_prompt: CONSERVATIVE_AUDIO_NEGATIVE_PROMPT,
-          resolution: "992x512",
-        } as FalAIRequest),
+        const queueData: FalAIQueueResponse = await queueResponse.json()
+        const requestId = queueData.request_id
+
+        // Poll for completion and retrieve Fal video URL
+        const falVideoUrl = await pollForCompletion(requestId)
+
+        // Fetch the video and upload to Supabase Storage
+        const videoFetch = await fetch(falVideoUrl)
+        if (!videoFetch.ok) {
+          throw new Error(
+            `Failed to download generated video for shot ${idx + 1}`
+          )
+        }
+        const arrayBuffer = await videoFetch.arrayBuffer()
+        const videoBlob = new Blob([arrayBuffer], { type: "video/mp4" })
+
+        const filename = `${requestId}_${idx + 1}.mp4`
+        const publicUrl = await uploadVideoToSupabase(videoBlob, filename)
+
+        return publicUrl
       })
-
-      if (!queueResponse.ok) {
-        throw new Error(`Failed to submit shot ${i + 1} to Fal AI`)
-      }
-
-      const queueData: FalAIQueueResponse = await queueResponse.json()
-      const requestId = queueData.request_id
-
-      // Poll for completion
-      const videoUrl = await pollForCompletion(requestId)
-      videoUrls.push(videoUrl)
-    }
+    )
 
     return NextResponse.json({
       success: true,
-      videos: videoUrls,
-      count: videoUrls.length,
+      videos: uploadedUrls,
+      count: uploadedUrls.length,
     })
   } catch (error) {
     console.error("Error generating videos:", error)
@@ -139,32 +161,46 @@ export async function POST(request: NextRequest) {
   }
 }
 
-function extractShotPrompts(shots: string): string[] {
-  // Parse the shots string to extract individual prompts
-  // This will depend on your shot format - adjust as needed
-  const shotLines = shots.split("\n").filter((line) => line.trim())
-  const prompts: string[] = []
-
-  let currentPrompt = ""
-  for (const line of shotLines) {
-    // Look for shot markers or prompts
-    if (line.match(/^(Shot|SHOT|\d+\.)/i)) {
-      if (currentPrompt) {
-        prompts.push(currentPrompt.trim())
+function normalizeShotsToPrompts(shotsInput: unknown): string[] {
+  // Supports: JSON string with { shots: string[] }, raw string with line-based shots, or direct string[]
+  try {
+    if (Array.isArray(shotsInput)) {
+      return shotsInput.filter(
+        (s) => typeof s === "string" && s.trim().length > 0
+      )
+    }
+    if (typeof shotsInput === "string") {
+      const trimmed = shotsInput.trim()
+      if (trimmed.startsWith("{") || trimmed.startsWith("[")) {
+        const parsed = JSON.parse(trimmed)
+        if (Array.isArray(parsed)) {
+          return parsed.filter(
+            (s) => typeof s === "string" && s.trim().length > 0
+          )
+        }
+        if (parsed && Array.isArray(parsed.shots)) {
+          return parsed.shots.filter(
+            (s: unknown) =>
+              typeof s === "string" && (s as string).trim().length > 0
+          )
+        }
       }
-      currentPrompt = line
-    } else if (currentPrompt) {
-      currentPrompt += " " + line
-    } else {
-      currentPrompt = line
+      // Fallback: split by blank lines to approximate shots
+      return trimmed
+        .split(/\n\n+/)
+        .map((s) => s.trim())
+        .filter((s) => s.length > 0)
+    }
+  } catch {
+    // On parse failure, fallback to line-based segmentation
+    if (typeof shotsInput === "string") {
+      return shotsInput
+        .split(/\n\n+/)
+        .map((s) => s.trim())
+        .filter((s) => s.length > 0)
     }
   }
-
-  if (currentPrompt) {
-    prompts.push(currentPrompt.trim())
-  }
-
-  return prompts.filter((p) => p.length > 0)
+  return []
 }
 
 async function pollForCompletion(requestId: string): Promise<string> {
@@ -188,9 +224,23 @@ async function pollForCompletion(requestId: string): Promise<string> {
     const statusData: FalAIStatusResponse = await statusResponse.json()
 
     if (statusData.status === "COMPLETED") {
-      if (statusData.output?.video?.url) {
-        return statusData.output.video.url
+      // Fetch the actual result from response_url
+      const resultResponse = await fetch(statusData.response_url, {
+        headers: {
+          Authorization: `Key ${FAL_KEY}`,
+        },
+      })
+
+      if (!resultResponse.ok) {
+        throw new Error("Failed to fetch video result")
       }
+
+      const resultData: FalAIResultResponse = await resultResponse.json()
+
+      if (resultData.video?.url) {
+        return resultData.video.url
+      }
+
       throw new Error("Video completed but no URL returned")
     }
 

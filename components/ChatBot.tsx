@@ -105,8 +105,7 @@ export default function ChatBot() {
 
       addMessage({
         role: "assistant",
-        content:
-          "Film generated successfully! Check the right panel to view and edit the shots.",
+        content: plannedShots,
         type: "shots",
       })
 
@@ -210,12 +209,6 @@ export default function ChatBot() {
 
       addMessage({
         role: "assistant",
-        content:
-          "Script generated! You can review and edit it below before continuing..",
-      })
-
-      addMessage({
-        role: "assistant",
         content: generatedScript,
         type: "script",
       })
@@ -271,10 +264,60 @@ export default function ChatBot() {
                   ? "bg-red-900 text-red-100"
                   : message.type === "suggestion"
                   ? "bg-yellow-900 text-yellow-100"
+                  : message.type === "script"
+                  ? "bg-gray-800 text-gray-100 border-2 border-purple-500"
+                  : message.type === "shots"
+                  ? "bg-gray-800 text-gray-100 border-2 border-green-500"
                   : "bg-gray-800 text-gray-100"
               }`}
             >
-              <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+              {message.type === "script" && (
+                <div className="flex items-center mb-2 pb-2 border-b border-purple-500">
+                  <svg
+                    className="w-5 h-5 mr-2 text-purple-400"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                    />
+                  </svg>
+                  <span className="font-semibold text-purple-400">Script</span>
+                </div>
+              )}
+              {message.type === "shots" && (
+                <div className="flex items-center mb-2 pb-2 border-b border-green-500">
+                  <svg
+                    className="w-5 h-5 mr-2 text-green-400"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"
+                    />
+                  </svg>
+                  <span className="font-semibold text-green-400">
+                    Shot Plan
+                  </span>
+                </div>
+              )}
+              <p
+                className={`text-sm whitespace-pre-wrap ${
+                  message.type === "script" || message.type === "shots"
+                    ? "font-mono"
+                    : ""
+                }`}
+              >
+                {message.content}
+              </p>
             </div>
           </div>
         ))}
@@ -290,65 +333,6 @@ export default function ChatBot() {
           </div>
         )}
       </div>
-
-      {/* Script and Shots Display */}
-      {!isEditingScript && (state.script || state.shots) && (
-        <div className="border-t border-gray-800 p-4 space-y-4 max-h-96 overflow-y-auto">
-          {/* Script Section */}
-          {state.script && (
-            <div className="bg-gray-900 rounded-lg border border-gray-700 p-3">
-              <h4 className="text-white font-semibold mb-2 text-sm flex items-center">
-                <svg
-                  className="w-4 h-4 mr-2"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                  />
-                </svg>
-                Script
-              </h4>
-              <div className="bg-gray-800 rounded p-2 max-h-32 overflow-y-auto">
-                <pre className="text-gray-300 text-xs whitespace-pre-wrap font-mono">
-                  {state.script}
-                </pre>
-              </div>
-            </div>
-          )}
-
-          {/* Shots Section */}
-          {state.shots && (
-            <div className="bg-gray-900 rounded-lg border border-gray-700 p-3">
-              <h4 className="text-white font-semibold mb-2 text-sm flex items-center">
-                <svg
-                  className="w-4 h-4 mr-2"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"
-                  />
-                </svg>
-                Shot Plan
-              </h4>
-              <div className="bg-gray-800 rounded p-2 max-h-32 overflow-y-auto">
-                <pre className="text-gray-300 text-xs whitespace-pre-wrap font-mono">
-                  {state.shots}
-                </pre>
-              </div>
-            </div>
-          )}
-        </div>
-      )}
 
       {/* Script Editor Modal */}
       {isEditingScript && state.script && (

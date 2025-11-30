@@ -1,6 +1,6 @@
-import ChatBot from "@/components/ChatBot";
-import FilmDisplay from "@/components/FilmDisplay";
-import { FilmProvider } from "@/lib/FilmContext";
+import ChatBot from "@/components/ChatBot"
+import FilmDisplay from "@/components/FilmDisplay"
+import { FilmProvider } from "@/lib/FilmContext"
 
 export default function Home() {
   return (
@@ -17,5 +17,5 @@ export default function Home() {
         </div>
       </div>
     </FilmProvider>
-  );
+  )
 }

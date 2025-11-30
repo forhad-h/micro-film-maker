@@ -151,7 +151,7 @@ export default function FilmDisplay() {
                   d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
                 />
               </svg>
-              Final Film
+              Your Tiny Film
             </h3>
             <video
               controls
