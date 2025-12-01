@@ -167,7 +167,7 @@ export default function FilmDisplay() {
               </p>
               <a
                 href={state.videoUrl}
-                download={`${state.filmSlug || "tiny-film"}.mp4`}
+                download={`${state.filmSlug || "micro-film"}.mp4`}
                 className="inline-flex items-center justify-center rounded bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 text-sm font-medium transition-colors shadow focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-2 focus:ring-offset-gray-900"
               >
                 <svg

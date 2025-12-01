@@ -18,7 +18,7 @@ export async function uploadVideoToSupabase(
   const baseFolder = folder ? `videos/${folder}` : "videos"
   const path = `${baseFolder}/${filename}`
   const { data, error } = await supabaseAdmin.storage
-    .from("tiny-films")
+    .from("micro-films")
     .upload(path, videoBlob, {
       contentType: "video/mp4",
       upsert: true,
@@ -30,7 +30,7 @@ export async function uploadVideoToSupabase(
 
   const {
     data: { publicUrl },
-  } = supabaseAdmin.storage.from("tiny-films").getPublicUrl(data.path)
+  } = supabaseAdmin.storage.from("micro-films").getPublicUrl(data.path)
 
   return publicUrl
 }
