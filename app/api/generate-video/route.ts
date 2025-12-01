@@ -99,7 +99,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Generate videos for each shot concurrently
-    const uploadedUrls: string[] = await Promise.all(
+    const falVideoUrls: string[] = await Promise.all(
       shotPrompts.map(async (prompt, idx) => {
         // Submit to Fal AI queue
         const queueResponse = await fetch("https://queue.fal.run/fal-ai/ovi", {
@@ -127,33 +127,17 @@ export async function POST(request: NextRequest) {
         // Poll for completion and retrieve Fal video URL
         const falVideoUrl = await pollForCompletion(requestId)
 
-        // Fetch the video and upload to Supabase Storage
-        const videoFetch = await fetch(falVideoUrl)
-        if (!videoFetch.ok) {
-          throw new Error(
-            `Failed to download generated video for shot ${idx + 1}`
-          )
-        }
-        const arrayBuffer = await videoFetch.arrayBuffer()
-        const videoBlob = new Blob([arrayBuffer], { type: "video/mp4" })
+        // Store to Supabase in background (don't await)
+        storeVideoInBackground(falVideoUrl, requestId, idx, filmSlug)
 
-        const filename = `${requestId}_${idx + 1}.mp4`
-        const publicUrl = await uploadVideoToSupabase(
-          videoBlob,
-          filename,
-          typeof filmSlug === "string" && filmSlug.trim().length > 0
-            ? filmSlug
-            : undefined
-        )
-
-        return publicUrl
+        return falVideoUrl
       })
     )
 
     return NextResponse.json({
       success: true,
-      videos: uploadedUrls,
-      count: uploadedUrls.length,
+      videos: falVideoUrls,
+      count: falVideoUrls.length,
     })
   } catch (error) {
     console.error("Error generating videos:", error)
@@ -163,6 +147,42 @@ export async function POST(request: NextRequest) {
           error instanceof Error ? error.message : "Failed to generate videos",
       },
       { status: 500 }
+    )
+  }
+}
+
+// Background function to store videos in Supabase without blocking the response
+async function storeVideoInBackground(
+  falVideoUrl: string,
+  requestId: string,
+  shotIndex: number,
+  filmSlug?: string
+) {
+  try {
+    const videoFetch = await fetch(falVideoUrl)
+    if (!videoFetch.ok) {
+      console.error(
+        `Failed to download video for shot ${shotIndex + 1} for background storage`
+      )
+      return
+    }
+    const arrayBuffer = await videoFetch.arrayBuffer()
+    const videoBlob = new Blob([arrayBuffer], { type: "video/mp4" })
+
+    const filename = `${requestId}_${shotIndex + 1}.mp4`
+    await uploadVideoToSupabase(
+      videoBlob,
+      filename,
+      typeof filmSlug === "string" && filmSlug.trim().length > 0
+        ? filmSlug
+        : undefined
+    )
+
+    console.log(`Successfully stored video for shot ${shotIndex + 1} in Supabase`)
+  } catch (error) {
+    console.error(
+      `Error storing video for shot ${shotIndex + 1} in background:`,
+      error
     )
   }
 }

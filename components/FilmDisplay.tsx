@@ -9,6 +9,7 @@ export default function FilmDisplay() {
   const [isGeneratingVideo, setIsGeneratingVideo] = useState(false)
   const [videoError, setVideoError] = useState<string | null>(null)
   const [progress, setProgress] = useState<string>("")
+  const [previewUrls, setPreviewUrls] = useState<string[]>([])
 
   useEffect(() => {
     // Automatically start video generation when shots are completed
@@ -28,11 +29,12 @@ export default function FilmDisplay() {
 
     setIsGeneratingVideo(true)
     setVideoError(null)
+    setPreviewUrls([])
     setProgress("Starting video generation...")
     setState({ ...state, step: "generating-video" })
 
     try {
-      // Step 1: Generate videos for each shot
+      // Step 1: Generate videos for each shot (now returns fal.ai URLs immediately)
       setProgress("Generating videos from shots...")
       const videoResponse = await fetch("/api/generate-video", {
         method: "POST",
@@ -46,10 +48,21 @@ export default function FilmDisplay() {
         throw new Error(videoData.error || "Failed to generate videos")
       }
 
-      // Step 2: Download all videos to browser
-      setProgress(`Downloading ${videoData.videos.length} videos...`)
+      // Store the fal.ai URLs - now available immediately!
+      const falVideoUrls = videoData.videos
+
+      // Show preview immediately
+      setPreviewUrls(falVideoUrls)
+      setState({
+        ...state,
+        videoUrls: falVideoUrls,
+        step: "generating-video",
+      })
+
+      // Step 2: Download all videos to browser from fal.ai URLs
+      setProgress(`Downloading ${falVideoUrls.length} videos...`)
       const videoBlobs = await Promise.all(
-        videoData.videos.map((url: string) => downloadVideo(url))
+        falVideoUrls.map((url: string) => downloadVideo(url))
       )
 
       // Step 3: Stitch videos in browser using FFmpeg.wasm
@@ -59,15 +72,15 @@ export default function FilmDisplay() {
       })
 
       // Step 4: Create a local blob URL for playback
-      // No need to upload - we stitch on-demand in the browser!
       const videoUrl = URL.createObjectURL(finalVideo)
 
       setProgress("Complete!")
 
-      // Update state with the local blob URL
+      // Update state with both the final video and individual shot URLs
       setState({
         ...state,
         videoUrl: videoUrl,
+        videoUrls: falVideoUrls,
         step: "completed",
       })
       setIsGeneratingVideo(false)
@@ -175,6 +188,32 @@ export default function FilmDisplay() {
                 Download Video
               </a>
             </div>
+          </div>
+        )}
+
+        {/* Individual Shots Preview - Show when available but final video not ready */}
+        {!state.videoUrl && state.videoUrls && state.videoUrls.length > 0 && (
+          <div className="bg-gray-900 rounded-lg border border-gray-700 p-4 mb-4">
+            <h3 className="text-lg font-medium text-gray-200 mb-3">
+              Individual Shots Preview
+            </h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {state.videoUrls.map((url, idx) => (
+                <div key={idx} className="bg-gray-800 rounded-lg p-2">
+                  <p className="text-xs text-gray-400 mb-2">Shot {idx + 1}</p>
+                  <video
+                    controls
+                    className="w-full rounded bg-black"
+                    src={url}
+                  >
+                    Your browser does not support the video tag.
+                  </video>
+                </div>
+              ))}
+            </div>
+            <p className="text-xs text-gray-400 mt-3">
+              Preview individual shots while we stitch them together into the final film.
+            </p>
           </div>
         )}
 
