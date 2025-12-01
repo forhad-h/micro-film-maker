@@ -70,48 +70,24 @@ export default function FilmDisplay() {
         videoUrl: videoUrl,
         step: "completed",
       })
+      setIsGeneratingVideo(false)
     } catch (error) {
       console.error("Error generating video:", error)
       setVideoError(
         error instanceof Error ? error.message : "Failed to generate video"
       )
       setState({ ...state, step: "completed" })
-    } finally {
       setIsGeneratingVideo(false)
-      setProgress("")
     }
   }
 
   const renderContent = () => {
-    if (state.step === "idle") {
-      return (
-        <div className="aspect-video bg-gray-900 rounded-lg border-2 border-dashed border-gray-700 flex items-center justify-center">
-          <div className="text-center">
-            <svg
-              className="mx-auto h-16 w-16 text-gray-600 mb-4"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M7 4v16M17 4v16M3 8h4m10 0h4M3 12h18M3 16h4m10 0h4M4 20h16a1 1 0 001-1V5a1 1 0 00-1-1H4a1 1 0 00-1 1v14a1 1 0 001 1z"
-              />
-            </svg>
-            <p className="text-gray-500 text-lg font-medium">
-              No film generated yet
-            </p>
-            <p className="text-gray-600 text-sm mt-2">
-              Use the chat to describe your film idea
-            </p>
-          </div>
-        </div>
-      )
-    }
-
-    if (state.step !== "completed" && state.step !== "generating-video") {
+    // Show loading state during initial processing steps (but not idle)
+    if (
+      state.step !== "idle" &&
+      state.step !== "completed" &&
+      state.step !== "generating-video"
+    ) {
       return (
         <div className="aspect-video bg-gray-900 rounded-lg border-2 border-gray-700 flex items-center justify-center">
           <div className="text-center">
@@ -119,21 +95,24 @@ export default function FilmDisplay() {
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
             </div>
             <p className="text-gray-400 text-lg font-medium">
-              {state.step.replace(/-/g, " ").toUpperCase()}...
+              {typeof state.step === "string"
+                ? state.step.replace(/-/g, " ").toUpperCase()
+                : "LOADING"}
+              ...
             </p>
           </div>
         </div>
       )
     }
 
-    return (
-      <>
-        {/* Video Player */}
-        {state.videoUrl && (
-          <div className="bg-gray-900 rounded-lg border border-gray-700 p-4 mb-4">
-            <h3 className="text-white font-semibold mb-3 flex items-center">
+    // Show idle/empty state
+    if (!state.videoUrl && !isGeneratingVideo) {
+      return (
+        <>
+          <div className="aspect-video bg-gray-900 rounded-lg border-2 border-dashed border-gray-700 flex items-center justify-center">
+            <div className="text-center">
               <svg
-                className="w-5 h-5 mr-2"
+                className="mx-auto h-16 w-16 text-gray-600 mb-4"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -142,21 +121,31 @@ export default function FilmDisplay() {
                   strokeLinecap="round"
                   strokeLinejoin="round"
                   strokeWidth={2}
-                  d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"
-                />
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                  d="M7 4v16M17 4v16M3 8h4m10 0h4M3 12h18M3 16h4m10 0h4M4 20h16a1 1 0 001-1V5a1 1 0 00-1-1H4a1 1 0 00-1 1v14a1 1 0 001 1z"
                 />
               </svg>
-              Your Micro-Film
-            </h3>
+              <p className="text-gray-500 text-lg font-medium">
+                No film generated yet
+              </p>
+              <p className="text-gray-600 text-sm mt-2">
+                Use the chat to describe your film idea
+              </p>
+            </div>
+          </div>
+        </>
+      )
+    }
+
+    return (
+      <>
+        {/* Video Player */}
+        {state.videoUrl && (
+          <div className="bg-gray-900 rounded-lg border border-gray-700 p-4 mb-4">
             <video
               controls
-              className="w-full rounded-lg bg-black"
+              className="w-full max-h-[80vh] rounded-lg bg-black object-contain"
               src={state.videoUrl}
+              style={{ display: "block", margin: "0 auto" }}
             >
               Your browser does not support the video tag.
             </video>
@@ -244,17 +233,7 @@ export default function FilmDisplay() {
 
   return (
     <div className="h-screen flex flex-col">
-      {/* Header */}
-      <div className="p-6 border-b border-gray-800">
-        <h2 className="text-2xl font-bold text-white">Generated Film</h2>
-        <p className="text-sm text-gray-400 mt-1">
-          {state.step === "completed"
-            ? "Your film is ready!"
-            : "Your film will appear here"}
-        </p>
-      </div>
-
-      {/* Film Display Area */}
+      {/* Film Display Area (no header) */}
       <div className="flex-1 overflow-y-auto p-6">
         <div className="w-full max-w-4xl mx-auto">{renderContent()}</div>
       </div>
