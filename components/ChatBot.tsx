@@ -168,7 +168,8 @@ export default function ChatBot() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    if (!input.trim() || isGenerating) return
+    // Prevent submission if already generating or if video generation is in progress
+    if (!input.trim() || isGenerating || state.step === "generating-video") return
 
     const userMessage = { role: "user" as const, content: input }
     addMessage(userMessage)
@@ -477,7 +478,7 @@ export default function ChatBot() {
               <ConceptSuggestions
                 concepts={conceptSuggestions}
                 onSelectConcept={handleSelectConcept}
-                isGenerating={isGenerating}
+                isGenerating={isGenerating || state.step === "generating-video"}
               />
             </div>
           )}
@@ -529,14 +530,20 @@ export default function ChatBot() {
                 onChange={(e) => setInput(e.target.value)}
                 placeholder="Describe your film idea..."
                 className="relative z-10 flex-1 bg-gray-800 text-white rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-600 placeholder-gray-500"
-                disabled={isGenerating}
+                disabled={isGenerating || state.step === "generating-video"}
               />
               <button
                 type="submit"
-                disabled={isGenerating || !input.trim()}
+                disabled={
+                  isGenerating ||
+                  !input.trim() ||
+                  state.step === "generating-video"
+                }
                 className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-700 disabled:cursor-not-allowed text-white rounded-lg px-6 py-3 font-medium transition-colors"
               >
-                {isGenerating ? "Processing..." : "Generate"}
+                {isGenerating || state.step === "generating-video"
+                  ? "Processing..."
+                  : "Generate"}
               </button>
             </form>
           </div>
