@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { useFilm } from "@/lib/FilmContext"
 import {
   ValidateConceptRequest,
@@ -31,10 +31,19 @@ export default function ChatBot() {
   )
   const [showSuggestions, setShowSuggestions] = useState(true)
   const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(false)
+  const messagesEndRef = useRef<HTMLDivElement>(null)
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
+  }
 
   useEffect(() => {
     fetchRandomConcepts()
   }, [])
+
+  useEffect(() => {
+    scrollToBottom()
+  }, [messages, isGenerating])
 
   const fetchRandomConcepts = async () => {
     setIsLoadingSuggestions(true)
@@ -75,8 +84,18 @@ export default function ChatBot() {
     })
 
     try {
+      // Minify JSON if the edited script is valid JSON
+      let scriptToValidate = editedScript
+      try {
+        const parsed = JSON.parse(editedScript)
+        scriptToValidate = JSON.stringify(parsed)
+      } catch {
+        // If not valid JSON, use as-is
+        scriptToValidate = editedScript
+      }
+
       const validateScriptRequest: ValidateScriptRequest = {
-        script: editedScript,
+        script: scriptToValidate,
       }
 
       const validateScriptResponse = await fetch("/api/validate-script", {
@@ -103,7 +122,7 @@ export default function ChatBot() {
           content: `Script validation found issues:\n${scriptValidation}\n\nPlease edit the script to address these issues.`,
           type: "error",
         })
-        setState({ ...state, step: "idle", script: editedScript })
+        setState({ ...state, step: "idle", script: scriptToValidate })
         setIsGenerating(false)
         return
       }
@@ -117,7 +136,7 @@ export default function ChatBot() {
       setState({ ...state, step: "planning-shots" })
 
       const shotsRequest: PlanShotsRequest = {
-        script: editedScript,
+        script: scriptToValidate,
         preferred_sound_style: state.preferredSoundStyle,
         target_platform: state.targetPlatform,
       }
@@ -139,7 +158,7 @@ export default function ChatBot() {
       setState({
         ...state,
         shots: plannedShots,
-        script: editedScript,
+        script: scriptToValidate,
         step: "completed",
       })
 
@@ -169,7 +188,8 @@ export default function ChatBot() {
     e.preventDefault()
 
     // Prevent submission if already generating or if video generation is in progress
-    if (!input.trim() || isGenerating || state.step === "generating-video") return
+    if (!input.trim() || isGenerating || state.step === "generating-video")
+      return
 
     const userMessage = { role: "user" as const, content: input }
     addMessage(userMessage)
@@ -293,13 +313,24 @@ export default function ChatBot() {
           refinedSlug = `${cleaned}-${Date.now()}`
         }
       }
+
+      // Prettify JSON if the script is valid JSON
+      let prettifiedScript = generatedScript
+      try {
+        const parsed = JSON.parse(generatedScript)
+        prettifiedScript = JSON.stringify(parsed, null, 2)
+      } catch {
+        // If not valid JSON, keep original
+        prettifiedScript = generatedScript
+      }
+
       setState({
         ...state,
         script: generatedScript,
         step: "validating-script",
         filmSlug: refinedSlug,
       })
-      setEditedScript(generatedScript)
+      setEditedScript(prettifiedScript)
 
       addMessage({
         role: "assistant",
@@ -426,6 +457,7 @@ export default function ChatBot() {
             </div>
           </div>
         )}
+        <div ref={messagesEndRef} />
       </div>
 
       {/* Script Editor Modal */}
@@ -437,8 +469,7 @@ export default function ChatBot() {
                 Edit Your Script
               </h2>
               <p className="text-gray-400 mb-6">
-                Review and modify the script below, then click Continue to
-                validate.
+                Review and modify the script below, then click Continue.
               </p>
 
               <div className="bg-gray-800 rounded-lg p-4 mb-6 border border-gray-700">
